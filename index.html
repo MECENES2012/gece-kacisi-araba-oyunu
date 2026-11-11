@@ -295,6 +295,26 @@
     if (hedefTablo) tabloyuCiz(hedefTablo, [], oyuncuAdi);
     if (durumEl) durumEl.textContent = "Skor tablosuna ulaşılamadı — internetini kontrol edip tekrar dene.";
   }
+  function tabloyuCiz(el, liste, vurguAd) {
+    if (!el) return;
+    if (!liste || !liste.length) {
+      el.innerHTML = '<div style="padding:18px;font-size:13px;color:#7f93b3">Tablo boş</div>';
+      return;
+    }
+    var madalya = ["🥇", "🥈", "🥉"];
+    var html = "<table><thead><tr><th>#</th><th>Oyuncu</th><th style='text-align:right'>Puan</th></tr></thead><tbody>";
+    for (var i = 0; i < liste.length; i++) {
+      var s = liste[i];
+      var benim = vurguAd && String(s.isim).toLocaleLowerCase("tr") === String(vurguAd).toLocaleLowerCase("tr");
+      var sira = s.sira <= 3 ? '<span class="mad">' + madalya[s.sira - 1] + "</span>" : s.sira;
+      html += '<tr class="' + (benim ? "benim" : "") + '"><td class="sira">' + sira + "</td><td>" + kacisHtml(s.isim) + '</td><td class="puan">' + s.puan + "</td></tr>";
+    }
+    html += "</tbody></table>";
+    el.innerHTML = html;
+  }
+  function kacisHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; });
+  }
   function skorGonder(isim, puan, mesafe) {
     try {
       var kayit = { isim: String(isim || "").slice(0, 16), puan: Math.round(puan), mesafe: Math.round(mesafe) };
