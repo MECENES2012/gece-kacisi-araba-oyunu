@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#05080f">
-<title>Gece Kaçışı 2D — Araba Oyunu</title>
+<title>MEC Yarış — Porsche Araba Oyunu</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
@@ -85,6 +85,20 @@
   #skorTablosu tr.benim td { color: #bfe9ff; }
   #tabloDurum { font-size: 12px; color: #7f93b3; }
   .mad { display: inline-block; font-size: 15px; }
+  .logo {
+    font-size: clamp(52px, 16vw, 110px); font-weight: 900; letter-spacing: .06em; line-height: 1;
+    background: linear-gradient(180deg, #fff, #7fd8ff 55%, #2b7fb8);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 6px 24px rgba(127,216,255,.45));
+    animation: logoNefes 3s ease-in-out infinite;
+  }
+  @keyframes logoNefes { 0%,100% { transform: scale(1); } 50% { transform: scale(1.04); } }
+  .odul {
+    font-size: 14px; color: #ffe08a; background: rgba(255,209,102,.10);
+    border: 1px solid rgba(255,209,102,.45); border-radius: 12px;
+    padding: 9px 16px; box-shadow: 0 0 24px rgba(255,190,60,.18);
+  }
+  .odul b { color: #fff3c4; }
 </style>
 </head>
 <body>
@@ -116,10 +130,12 @@
     </div>
   </div>
 
-  <!-- 1) İSİM EKRANI -->
+  <!-- 1) GİRİŞ EKRANI -->
   <div class="katman" id="isimEkrani">
-    <h1>GECE KAÇIŞI 2D</h1>
-    <p>Üstten görünümlü 2D gece otoyolunda trafiğe karşı yarış. Skorun isminle birlikte canlı skor tablosuna yazılır.</p>
+    <div class="logo">MEC</div>
+    <h1>MEC YARIŞ</h1>
+    <p>Porsche ile gece otoyolunda trafiğe karşı yarış. Skorun isminle birlikte canlı skor tablosuna yazılır.</p>
+    <div class="odul">🏆 En yüksek skora <b>300 TL ödül!</b></div>
     <input type="text" id="isimGirdi" maxlength="16" placeholder="İsmini yaz" autocomplete="off" autocapitalize="words" spellcheck="false">
     <div class="satir">
       <button id="oynaBtn">OYNA</button>
@@ -129,6 +145,7 @@
       <kbd>Boşluk</kbd> nitro
       <kbd>P</kbd> duraklat
     </div>
+    <p style="font-size:12px;color:#7f93b3">Telefonda: alttaki ◀ ▶ ve NITRO düğmeleri · ekranda kaydırmak da olur</p>
     <div id="tabloDurum"></div>
     <div id="skorTablosu"></div>
   </div>
@@ -476,7 +493,8 @@
   }
 
   // ---------- Üretim ----------
-  const RENKLER = ["#ef476f", "#ffd166", "#06d6a0", "#118ab2", "#f78c6b", "#b388ff", "#e0e0e0"];
+  const RENKLER = ["#ef476f", "#ffd166", "#06d6a0", "#118ab2", "#f78c6b", "#b388ff", "#e0e0e0", "#c2410c", "#1d4ed8"];
+  const ARABA_ADLARI = ["Porsche 911", "Ferrari", "Lamborghini", "BMW M4", "Audi RS", "Mercedes AMG", "Tofaş", "Nissan GT-R", "Mustang"];
 
   function yeniTrafik() {
     // en fazla 2 şerit dolu olsun
@@ -492,6 +510,7 @@
       gen: kamyon ? 1.25 : 0.9,
       uz: kamyon ? 4.4 : 2.2,
       renk: RENKLER[Math.floor(Math.random() * RENKLER.length)],
+      ad: ARABA_ADLARI[Math.floor(Math.random() * ARABA_ADLARI.length)],
       hizFark: kamyon ? rastgele(-5, -1) : rastgele(3, 11),
       carpildi: false, gecenSure: 0,
     });
@@ -756,12 +775,21 @@
       if (ey < -160 || ey > H + 160) continue;
       const ex = ys + sg * (tr.x / SERIT_G + 1) + sg / 2;
       cizAraba2D(ex, ey, tr.gen * sg * 0.64, tr.uz * YOL_BIRIM * 0.88, tr.renk, tr.kamyon, false);
+      // araba adı etiketi (yakındaki araçlarda)
+      if (tr.ad && ey > -40 && ey < H * 0.92) {
+        ctx.globalAlpha = 0.85;
+        ctx.fillStyle = "#dbeafe";
+        ctx.font = '700 ' + Math.max(9, Math.min(13, sg * 0.20)) + 'px "Segoe UI", sans-serif';
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText(tr.ad, ex, ey + tr.uz * YOL_BIRIM * 0.44 + 12);
+        ctx.globalAlpha = 1;
+      }
     }
 
     // --- oyuncu ---
     const oy = H - 110;
     const ox = ys + sg * (ARAC.x / SERIT_G + 1) + sg / 2;
-    cizAraba2D(ox, oy, oyuncuGen(), OYUNCU_UZ, "#3ec7ff", false, true, t);
+    cizPorsche(ox, oy, oyuncuGen(), OYUNCU_UZ, t);
 
     // parçacıklar
     for (const p of parcalar) {
@@ -799,6 +827,145 @@
     vig.addColorStop(1, "rgba(0,4,10,.55)");
     ctx.fillStyle = vig;
     ctx.fillRect(0, 0, W, H);
+  }
+
+  // Porsche 911 — üstten çizim (gümüş gövde, geniş arka, yuvarlak farlar)
+  function cizPorsche(x, y, w, h, t) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(ARAC.yatma * 0.05);
+
+    const gövdeGrad = ctx.createLinearGradient(-w / 2, 0, w / 2, 0);
+    gövdeGrad.addColorStop(0, "#4b5563");
+    gövdeGrad.addColorStop(0.18, "#cbd5e1");
+    gövdeGrad.addColorStop(0.42, "#f1f5f9");
+    gövdeGrad.addColorStop(0.62, "#e2e8f0");
+    gövdeGrad.addColorStop(0.86, "#94a3b8");
+    gövdeGrad.addColorStop(1, "#374151");
+
+    // gölge
+    ctx.fillStyle = "rgba(0,0,0,.5)";
+    ctx.beginPath(); ctx.ellipse(4, 6, w * 0.62, h * 0.5, 0, 0, 6.284); ctx.fill();
+
+    // tekerler (geniş arka lastikler)
+    ctx.fillStyle = "#0a0b10";
+    const tw = Math.max(3, w * 0.14);
+    ctx.beginPath(); ctx.roundRect(-w / 2 - tw * 0.35, -h * 0.29, tw, h * 0.15, 2); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(w / 2 - tw * 0.65, -h * 0.29, tw, h * 0.15, 2); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(-w / 2 - tw * 0.45, h * 0.14, tw * 1.15, h * 0.17, 2); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(w / 2 - tw * 0.70, h * 0.14, tw * 1.15, h * 0.17, 2); ctx.fill();
+
+    // ana gövde (Porsche'un yuvarlak hatları)
+    ctx.fillStyle = gövdeGrad;
+    ctx.beginPath();
+    ctx.moveTo(0, -h * 0.50);
+    ctx.bezierCurveTo(w * 0.30, -h * 0.47, w * 0.46, -h * 0.30, w * 0.47, -h * 0.10);
+    ctx.bezierCurveTo(w * 0.50, h * 0.10, w * 0.52, h * 0.28, w * 0.47, h * 0.45);
+    ctx.quadraticCurveTo(w * 0.25, h * 0.52, 0, h * 0.52);
+    ctx.quadraticCurveTo(-w * 0.25, h * 0.52, -w * 0.47, h * 0.45);
+    ctx.bezierCurveTo(-w * 0.52, h * 0.28, -w * 0.50, h * 0.10, -w * 0.47, -h * 0.10);
+    ctx.bezierCurveTo(-w * 0.46, -h * 0.30, -w * 0.30, -h * 0.47, 0, -h * 0.50);
+    ctx.closePath();
+    ctx.fill();
+
+    // ön kaput çizgileri
+    ctx.strokeStyle = "rgba(255,255,255,.35)";
+    ctx.lineWidth = Math.max(1, w * 0.025);
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.22, -h * 0.34); ctx.lineTo(-w * 0.12, -h * 0.16);
+    ctx.moveTo(w * 0.22, -h * 0.34); ctx.lineTo(w * 0.12, -h * 0.16);
+    ctx.stroke();
+
+    // ön cam (eğimli)
+    ctx.fillStyle = "rgba(14,26,42,.94)";
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.28, -h * 0.10);
+    ctx.quadraticCurveTo(0, -h * 0.20, w * 0.28, -h * 0.10);
+    ctx.lineTo(w * 0.26, h * 0.04);
+    ctx.quadraticCurveTo(0, -h * 0.02, -w * 0.26, h * 0.04);
+    ctx.closePath();
+    ctx.fill();
+
+    // tavan
+    ctx.fillStyle = "rgba(255,255,255,.16)";
+    ctx.beginPath();
+    ctx.roundRect(-w * 0.24, h * 0.03, w * 0.48, h * 0.20, Math.max(3, w * 0.09));
+    ctx.fill();
+
+    // arka cam
+    ctx.fillStyle = "rgba(14,26,42,.94)";
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.25, h * 0.24);
+    ctx.quadraticCurveTo(0, h * 0.30, w * 0.25, h * 0.24);
+    ctx.lineTo(w * 0.20, h * 0.37);
+    ctx.quadraticCurveTo(0, h * 0.41, -w * 0.20, h * 0.37);
+    ctx.closePath();
+    ctx.fill();
+
+    // yuvarlak farlar (Porsche imzası)
+    const farR = Math.max(2.5, w * 0.105);
+    for (const fx of [-w * 0.28, w * 0.28]) {
+      ctx.fillStyle = "#f8fafc";
+      ctx.beginPath(); ctx.ellipse(fx, -h * 0.42, farR, farR * 0.85, 0, 0, 6.284); ctx.fill();
+      ctx.fillStyle = "#0f172a";
+      ctx.beginPath(); ctx.ellipse(fx, -h * 0.42, farR * 0.42, farR * 0.42, 0, 0, 6.284); ctx.fill();
+    }
+    // far huzmesi
+    ctx.globalAlpha = 0.10;
+    const huzme = ctx.createLinearGradient(0, -h * 0.5, 0, -h * 1.6);
+    huzme.addColorStop(0, "rgba(255,250,220,.9)");
+    huzme.addColorStop(1, "rgba(255,250,220,0)");
+    ctx.fillStyle = huzme;
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.42, -h * 0.48);
+    ctx.lineTo(w * 0.42, -h * 0.48);
+    ctx.lineTo(w * 0.75, -h * 1.5);
+    ctx.lineTo(-w * 0.75, -h * 1.5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // ince stop lambası şeridi (911 karakteri)
+    ctx.shadowColor = "#ff2d2d"; ctx.shadowBlur = 14;
+    ctx.fillStyle = "#ff3b3b";
+    ctx.beginPath();
+    ctx.roundRect(-w * 0.36, h * 0.44, w * 0.72, Math.max(2.5, h * 0.022), 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // PORSCHE yazısı
+    ctx.fillStyle = "rgba(15,23,42,.75)";
+    ctx.font = "700 " + Math.max(4, w * 0.13) + 'px "Segoe UI", sans-serif';
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("PORSCHE", 0, h * 0.47);
+
+    // kalkan
+    if (kalkan > 0) {
+      ctx.strokeStyle = "rgba(140,232,255," + (0.35 + Math.sin((t || 0) * 8) * 0.15).toFixed(2) + ")";
+      ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.ellipse(0, 0, w * 0.9, h * 0.75, 0, 0, 6.284); ctx.stroke();
+    }
+
+    // nitro alevleri
+    if (ARAC.nitroAktif) {
+      for (const ex of [-w * 0.20, w * 0.20]) {
+        const boy = 22 + Math.random() * 24;
+        const fg = ctx.createLinearGradient(ex, h * 0.5, ex, h * 0.5 + boy);
+        fg.addColorStop(0, "rgba(190,255,140,.95)");
+        fg.addColorStop(0.6, "rgba(90,220,255,.55)");
+        fg.addColorStop(1, "rgba(90,220,255,0)");
+        ctx.fillStyle = fg;
+        ctx.beginPath();
+        ctx.moveTo(ex - w * 0.09, h * 0.5);
+        ctx.lineTo(ex + w * 0.09, h * 0.5);
+        ctx.lineTo(ex + w * 0.03, h * 0.5 + boy);
+        ctx.lineTo(ex - w * 0.03, h * 0.5 + boy);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+
+    ctx.restore();
   }
 
   // 2D araba çizimi (üstten)
