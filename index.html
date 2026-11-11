@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#05080f">
-<title>Gece Kaçışı 2D — Araba Oyunu</title>
+<title>MEC Yarış — Tofaş Araba Oyunu</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
@@ -85,6 +85,20 @@
   #skorTablosu tr.benim td { color: #bfe9ff; }
   #tabloDurum { font-size: 12px; color: #7f93b3; }
   .mad { display: inline-block; font-size: 15px; }
+  .logo {
+    font-size: clamp(52px, 16vw, 110px); font-weight: 900; letter-spacing: .06em; line-height: 1;
+    background: linear-gradient(180deg, #fff, #7fd8ff 55%, #2b7fb8);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 6px 24px rgba(127,216,255,.45));
+    animation: logoNefes 3s ease-in-out infinite;
+  }
+  @keyframes logoNefes { 0%,100% { transform: scale(1); } 50% { transform: scale(1.04); } }
+  .odul {
+    font-size: 14px; color: #ffe08a; background: rgba(255,209,102,.10);
+    border: 1px solid rgba(255,209,102,.45); border-radius: 12px;
+    padding: 9px 16px; box-shadow: 0 0 24px rgba(255,190,60,.18);
+  }
+  .odul b { color: #fff3c4; }
 </style>
 </head>
 <body>
@@ -116,10 +130,12 @@
     </div>
   </div>
 
-  <!-- 1) İSİM EKRANI -->
+  <!-- 1) GİRİŞ EKRANI -->
   <div class="katman" id="isimEkrani">
-    <h1>GECE KAÇIŞI 2D</h1>
-    <p>Üstten görünümlü 2D gece otoyolunda trafiğe karşı yarış. Skorun isminle birlikte canlı skor tablosuna yazılır.</p>
+    <div class="logo">MEC</div>
+    <h1>MEC YARIŞ</h1>
+    <p>Tofaş ile gece otoyolunda trafiğe karşı yarış. Skorun isminle canlı tabloya yazılır. Skorun isminle birlikte canlı skor tablosuna yazılır.</p>
+    <div class="odul">🏆 En yüksek skora <b>300 TL ödül!</b></div>
     <input type="text" id="isimGirdi" maxlength="16" placeholder="İsmini yaz" autocomplete="off" autocapitalize="words" spellcheck="false">
     <div class="satir">
       <button id="oynaBtn">OYNA</button>
@@ -129,6 +145,7 @@
       <kbd>Boşluk</kbd> nitro
       <kbd>P</kbd> duraklat
     </div>
+    <p style="font-size:12px;color:#7f93b3">Telefonda: alttaki ◀ ▶ ve NITRO düğmeleri · ekranda kaydırmak da olur</p>
     <div id="tabloDurum"></div>
     <div id="skorTablosu"></div>
   </div>
@@ -260,40 +277,82 @@
     el.style.display = goster ? "flex" : "none";
   }
 
-  // ---------- Skor tablosu (çevrim içi: herkesin puanı bu tabloda) ----------
-  const SKOR_BIN = "https://mantledb.sh/v2/gece-kacisi-mecenes2012-2026/skorlar";
-  function tumSkorlariOku() {
-    return skorListesi.slice();
+  // ---------- Skor tablosu (çevrim içi — açık yazma uç noktası + yedek) ----------
+  // Okuma:  GET  -> skorlar listesi (herkes okuyabilir)
+  // Yazma:  POST -> tüm liste sunucuya yazılır (5 saniyede bir gönderim)
+  const SKOR_KAYNAKLAR = [
+    "https://mantledb.sh/v2/gece-kacisi-mecenes2012-2026/skorlar",
+    "https://mantledb.sh/v2/gece-kacisi-mecenes2012-2026/skorlar2"
+  ];
+  function skorlariTekKaynaktanOku(url) {
+    return new Promise(function (res, rej) {
+      var x = new XMLHttpRequest();
+      x.open("GET", url + "?t=" + Date.now(), true);
+      x.timeout = 12000;
+      x.onload = function () {
+        if (x.status !== 200) { rej(new Error("http " + x.status)); return; }
+        try { res(JSON.parse(x.responseText)); } catch (e) { rej(e); }
+      };
+      x.onerror = function () { rej(new Error("ag hatasi")); };
+      x.ontimeout = function () { rej(new Error("zaman asimi")); };
+      try { x.send(); } catch (e) { rej(e); }
+    });
+  }
+  function skorlariTekKaynagaYaz(url, veri) {
+    return new Promise(function (res, rej) {
+      var x = new XMLHttpRequest();
+      x.open("POST", url, true);
+      x.setRequestHeader("Content-Type", "application/json");
+      x.timeout = 12000;
+      x.onload = function () {
+        if (x.status >= 200 && x.status < 300) res(true);
+        else rej(new Error("yazma " + x.status));
+      };
+      x.onerror = function () { rej(new Error("ag hatasi")); };
+      x.ontimeout = function () { rej(new Error("zaman asimi")); };
+      try { x.send(JSON.stringify(veri)); } catch (e) { rej(e); }
+    });
+  }
+  function skorlariBirlestir(ham) {
+    var enIyi = new Map();
+    for (var i = 0; i < ham.length; i++) {
+      var k = ham[i];
+      if (!k || !k.isim || !(k.puan > 0)) continue;
+      var a = String(k.isim).toLocaleLowerCase("tr");
+      var o = enIyi.get(a);
+      if (!o || k.puan > o.puan) enIyi.set(a, { isim: String(k.isim).slice(0, 16), puan: Math.round(k.puan), mesafe: Math.round(k.mesafe || 0) });
+    }
+    return Array.from(enIyi.values()).sort(function (x, y) { return y.puan - x.puan; }).slice(0, 100);
+  }
+  function yereleYaz(liste) {
+    try { localStorage.setItem("gece2dSkorlar", JSON.stringify(liste.slice(0, 100))); } catch (e) {}
+  }
+  function yereldenOku() {
+    try { return JSON.parse(localStorage.getItem("gece2dSkorlar") || "[]"); } catch (e) { return []; }
   }
   function skorlariYukle(hedefTablo, durumEl, vurguAd) {
     tabloyuCiz(hedefTablo, [], vurguAd);
     if (durumEl) durumEl.textContent = "Skorlar yükleniyor…";
-    fetch(SKOR_BIN, { cache: "no-store" }).then(function (r) {
-      if (!r.ok) throw new Error("http " + r.status);
-      return r.json();
-    }).then(function (d) {
-      var ham = (d && d.skorlar) || [];
-      var enIyi = new Map();
-      for (var i = 0; i < ham.length; i++) {
-        var k = ham[i];
-        if (!k || !k.isim || !(k.puan > 0)) continue;
-        var anahtar = String(k.isim).toLocaleLowerCase("tr");
-        var onceki = enIyi.get(anahtar);
-        if (!onceki || k.puan > onceki.puan) enIyi.set(anahtar, { isim: String(k.isim).slice(0, 16), puan: Math.round(k.puan) });
+    var deneme = 0;
+    function dene() {
+      if (deneme >= SKOR_KAYNAKLAR.length) {
+        // çevrim içi yoksa cihazdaki skorları göster
+        var yerel = skorlariBirlestir(yereldenOku());
+        skorListesi = yerel.map(function (k, n) { return { sira: n + 1, isim: k.isim, puan: k.puan }; });
+        tabloyuCiz(hedefTablo, skorListesi, vurguAd);
+        if (durumEl) durumEl.textContent = "Çevrim içi tabloya ulaşılamadı — bu cihazdaki skorlar gösteriliyor.";
+        return;
       }
-      skorListesi = Array.from(enIyi.values())
-        .sort(function (a, b) { return b.puan - a.puan; })
-        .slice(0, 50)
-        .map(function (k, n) { return { sira: n + 1, isim: k.isim, puan: k.puan }; });
-      apiVar = true;
-      tabloyuCiz(hedefTablo, skorListesi, vurguAd);
-      if (durumEl) durumEl.textContent = skorListesi.length ? skorListesi.length + " oyuncu kayıtlı" : "Henüz skor yok — ilk sen ol!";
-    }).catch(function () { tabloHata(hedefTablo, durumEl); });
-  }
-  function tabloHata(hedefTablo, durumEl) {
-    apiVar = false;
-    if (hedefTablo) tabloyuCiz(hedefTablo, [], oyuncuAdi);
-    if (durumEl) durumEl.textContent = "Skor tablosuna ulaşılamadı — internetini kontrol edip tekrar dene.";
+      var url = SKOR_KAYNAKLAR[deneme++];
+      skorlariTekKaynaktanOku(url).then(function (d) {
+        var liste = skorlariBirlestir(((d && d.skorlar) || []).concat(yereldenOku()));
+        skorListesi = liste.map(function (k, n) { return { sira: n + 1, isim: k.isim, puan: k.puan }; });
+        apiVar = true;
+        tabloyuCiz(hedefTablo, skorListesi, vurguAd);
+        if (durumEl) durumEl.textContent = skorListesi.length ? skorListesi.length + " oyuncu kayıtlı" : "Henüz skor yok — ilk sen ol!";
+      }).catch(function () { dene(); });
+    }
+    dene();
   }
   function tabloyuCiz(el, liste, vurguAd) {
     if (!el) return;
@@ -315,47 +374,38 @@
   function kacisHtml(s) {
     return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; });
   }
+
+  // Skoru önce bu cihaza yaz, sonra (birkaç denemeyle) çevrim içi tabloya gönder
   function skorGonder(isim, puan, mesafe) {
-    try {
-      var kayit = { isim: String(isim || "").slice(0, 16), puan: Math.round(puan), mesafe: Math.round(mesafe) };
-      if (!kayit.isim || !(kayit.puan > 0)) return;
-      $("siraBilgi").textContent = "Skorun kaydediliyor…";
-      fetch(SKOR_BIN, { cache: "no-store" }).then(function (r) {
-        return r.ok ? r.json() : { skorlar: [] };
-      }).then(function (d) {
-        var liste = ((d && d.skorlar) || []).slice();
-        liste.push(kayit);
-        var enIyi = new Map();
-        for (var i = 0; i < liste.length; i++) {
-          var k = liste[i];
-          if (!k || !k.isim || !(k.puan > 0)) continue;
-          var a = String(k.isim).toLocaleLowerCase("tr");
-          var o = enIyi.get(a);
-          if (!o || k.puan > o.puan) enIyi.set(a, { isim: String(k.isim).slice(0, 16), puan: Math.round(k.puan), mesafe: Math.round(k.mesafe || 0) });
-        }
-        var yeni = Array.from(enIyi.values()).sort(function (x, y) { return y.puan - x.puan; }).slice(0, 100);
-        return fetch(SKOR_BIN, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ skorlar: yeni })
-        }).then(function (w) {
-          if (!w.ok) throw new Error("kaydetme hatasi");
-          return yeni;
-        });
-      }).then(function (yeni) {
-        var sira = yeni.filter(function (k) { return k.puan > kayit.puan; }).length + 1;
-        $("siraBilgi").textContent = "Skorun kaydedildi! Herkesin tablosunda " + sira + ". sıradasın (" + yeni.length + " oyuncu).";
-        setTimeout(function () { skorlariYukle($("skorTablosu"), null, oyuncuAdi); }, 2000);
-      }).catch(function () { skorYerelKaydet(kayit); });
-    } catch (e) { /* sessiz */ }
-  }
-  function skorYerelKaydet(kayit) {
-    try {
-      var v = JSON.parse(localStorage.getItem("gece2dSkorlar") || "[]");
-      v.push({ isim: kayit.isim, puan: kayit.puan });
-      localStorage.setItem("gece2dSkorlar", JSON.stringify(v.slice(-100)));
-    } catch (e2) {}
-    $("siraBilgi").textContent = "İnternete bağlanılamadı, skor bu cihaza kaydedildi.";
+    var kayit = { isim: String(isim || "").slice(0, 16), puan: Math.round(puan), mesafe: Math.round(mesafe) };
+    if (!kayit.isim || !(kayit.puan > 0)) return;
+    var yerel = yereldenOku();
+    yerel.push(kayit);
+    yereleYaz(skorlariBirlestir(yerel));
+    $("siraBilgi").textContent = "Skorun kaydediliyor…";
+
+    var deneme = 0;
+    function gonder() {
+      if (deneme > 3) {
+        $("siraBilgi").textContent = "İnternete şu an ulaşılamadı — skor bu cihaza kaydedildi, bağlantı gelince tabloya eklenecek.";
+        return;
+      }
+      deneme++;
+      skorlariTekKaynaktanOku(SKOR_KAYNAKLAR[0]).then(function (d) {
+        return skorlariBirlestir(((d && d.skorlar) || []).concat(yereldenOku()));
+      }).catch(function () {
+        return skorlariBirlestir(yereldenOku());
+      }).then(function (liste) {
+        return skorlariTekKaynagaYaz(SKOR_KAYNAKLAR[0], { skorlar: liste }).then(function () { return liste; });
+      }).then(function (liste) {
+        var sira = liste.filter(function (k) { return k.puan > kayit.puan; }).length + 1;
+        $("siraBilgi").textContent = "Skorun kaydedildi! Herkesin tablosunda " + sira + ". sıradasın (" + liste.length + " oyuncu).";
+        setTimeout(function () { skorlariYukle($("skorTablosu"), null, oyuncuAdi); }, 1500);
+      }).catch(function () {
+        setTimeout(gonder, 2000);
+      });
+    }
+    gonder();
   }
 
   // ---------- Kontroller ----------
@@ -392,26 +442,41 @@
     el.addEventListener("mouseup", bit);
     el.addEventListener("mouseleave", bit);
   }
-  dugmeBagla($("solDugme"), "sol");
-  dugmeBagla($("sagDugme"), "sag");
+  // Yön düğmeleri: SADECE tek dokunuşta bir şerit (basılı tutma yok — çift kayma olmasın)
+  function yonDugmesi(el, yon) {
+    var sonZaman = 0;
+    el.addEventListener("touchstart", function (e) {
+      e.preventDefault(); e.stopPropagation();
+      if (basili["ArrowLeft"] || basili["ArrowRight"]) return;
+      seritDegistir(yon);
+      el.classList.add("bas");
+    }, { passive: false });
+    el.addEventListener("touchend", function (e) { e.preventDefault(); el.classList.remove("bas"); }, { passive: false });
+    el.addEventListener("touchcancel", function () { el.classList.remove("bas"); });
+    // fareyle: aynı anda iki şerit gitmesin diye tek sefer
+    el.addEventListener("mousedown", function (e) {
+      e.preventDefault(); e.stopPropagation();
+      if (basili["ArrowLeft"] || basili["ArrowRight"]) return;
+      seritDegistir(yon);
+    });
+  }
+  yonDugmesi($("solDugme"), -1);
+  yonDugmesi($("sagDugme"), 1);
   dugmeBagla($("nitroDugme"), "nitro");
-  $("solDugme").addEventListener("touchstart", () => seritDegistir(-1), { passive: true });
-  $("sagDugme").addEventListener("touchstart", () => seritDegistir(1), { passive: true });
 
-  let baslaX = null, baslaY = null, kaydirildi = false;
+  let baslaX = null, baslaY = null;
   canvas.addEventListener("pointerdown", e => {
     if (durum !== OYUN) return;
-    baslaX = e.clientX; baslaY = e.clientY; kaydirildi = false;
+    baslaX = e.clientX; baslaY = e.clientY;
   });
-  canvas.addEventListener("pointermove", e => {
-    if (baslaX === null || kaydirildi || durum !== OYUN) return;
-    const dx = e.clientX - baslaX, dy = e.clientY - baslaY;
-    if (Math.abs(dx) > 32 && Math.abs(dx) > Math.abs(dy)) {
-      seritDegistir(dx > 0 ? 1 : -1);
-      kaydirildi = true;
-    }
+  window.addEventListener("pointerup", e => {
+    if (baslaX === null) return;
+    var dx = e.clientX - baslaX, dy = e.clientY - baslaY;
+    baslaX = null;
+    if (durum !== OYUN) return;
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) seritDegistir(dx > 0 ? 1 : -1);
   });
-  window.addEventListener("pointerup", () => { baslaX = null; });
+  window.addEventListener("pointercancel", function () { baslaX = null; });
 
   function duraklat() {
     if (durum === OYUN) {
@@ -476,22 +541,34 @@
   }
 
   // ---------- Üretim ----------
-  const RENKLER = ["#ef476f", "#ffd166", "#06d6a0", "#118ab2", "#f78c6b", "#b388ff", "#e0e0e0"];
+  const RENKLER = ["#ef476f", "#ffd166", "#06d6a0", "#118ab2", "#f78c6b", "#b388ff", "#e0e0e0", "#c2410c", "#1d4ed8"];
+  const ARABA_ADLARI = ["Porsche 911", "Ferrari", "Lamborghini", "BMW M4", "Audi RS", "Mercedes AMG", "Tofaş", "Nissan GT-R", "Mustang"];
 
   function yeniTrafik() {
-    // en fazla 2 şerit dolu olsun
-    const dolu = new Set(trafik.filter(t => t.z - z < GORUS * 0.6).map(t => t.serit));
-    const bos = [0, 1, 2].filter(i => !dolu.has(i));
-    const serit = bos.length ? bos[Math.floor(Math.random() * bos.length)] : Math.floor(Math.random() * 3);
+    // Aynı anda 3 şeritte birden araba olmasın:
+    // ekranın görünür bölgesindeki dolu şeritler + yeni araçla aynı hizaya gelecek şeritler hesaba katılır.
+    const yeniZ = z + GORUS + rastgele(0, 40);
+    const dolu = new Set();
+    for (const t of trafik) {
+      if (t.z - z < GORUS * 0.85 && Math.abs(t.z - yeniZ) < 34) dolu.add(t.serit);
+    }
+    // görünür alanda hiç boş şerit bırakma kuralı
+    const gorunurDolu = new Set(trafik.filter(t => t.z - z > 0 && t.z - z < GORUS * 0.85).map(t => t.serit));
+    const serbest = [0, 1, 2].filter(i => !dolu.has(i));
+    // 3 şeridin tamamı kapanacaksa üretme
+    if (serbest.length === 0) return;
+    const yeniGorunurDolu = new Set(gorunurDolu); yeniGorunurDolu.add(-1);
+    const serit = serbest[Math.floor(Math.random() * serbest.length)];
     const kamyon = Math.random() < 0.3;
     trafik.push({
       serit,
       x: seritMerkez(serit),
-      z: z + GORUS + rastgele(0, 40),
+      z: yeniZ,
       kamyon,
       gen: kamyon ? 1.25 : 0.9,
       uz: kamyon ? 4.4 : 2.2,
       renk: RENKLER[Math.floor(Math.random() * RENKLER.length)],
+      ad: ARABA_ADLARI[Math.floor(Math.random() * ARABA_ADLARI.length)],
       hizFark: kamyon ? rastgele(-5, -1) : rastgele(3, 11),
       carpildi: false, gecenSure: 0,
     });
@@ -548,7 +625,7 @@
     sarsinti = Math.max(0, sarsinti - dt * 3);
 
     // 2D: aynı anda ekranda en fazla 5 araç olsun, yeterince nefes payı kalsın
-    if (trafik.length < 5 && z + GORUS > sonTrafik + rastgele(26, 48)) { yeniTrafik(); sonTrafik = z; }
+    if (trafik.length < 4 && z + GORUS > sonTrafik + rastgele(26, 48)) { yeniTrafik(); sonTrafik = z; }
     if (esyalar.length < 2 && z + GORUS > sonEsya + rastgele(110, 210)) { yeniEsya(); sonEsya = z; }
 
     // trafik
@@ -756,12 +833,21 @@
       if (ey < -160 || ey > H + 160) continue;
       const ex = ys + sg * (tr.x / SERIT_G + 1) + sg / 2;
       cizAraba2D(ex, ey, tr.gen * sg * 0.64, tr.uz * YOL_BIRIM * 0.88, tr.renk, tr.kamyon, false);
+      // araba adı etiketi (yakındaki araçlarda)
+      if (tr.ad && ey > -40 && ey < H * 0.92) {
+        ctx.globalAlpha = 0.85;
+        ctx.fillStyle = "#dbeafe";
+        ctx.font = '700 ' + Math.max(9, Math.min(13, sg * 0.20)) + 'px "Segoe UI", sans-serif';
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText(tr.ad, ex, ey + tr.uz * YOL_BIRIM * 0.44 + 12);
+        ctx.globalAlpha = 1;
+      }
     }
 
     // --- oyuncu ---
     const oy = H - 110;
     const ox = ys + sg * (ARAC.x / SERIT_G + 1) + sg / 2;
-    cizAraba2D(ox, oy, oyuncuGen(), OYUNCU_UZ, "#3ec7ff", false, true, t);
+    cizTofas(ox, oy, oyuncuGen(), OYUNCU_UZ, t);
 
     // parçacıklar
     for (const p of parcalar) {
@@ -799,6 +885,138 @@
     vig.addColorStop(1, "rgba(0,4,10,.55)");
     ctx.fillStyle = vig;
     ctx.fillRect(0, 0, W, H);
+  }
+
+  // TOFAŞ (Kartal/SLX) — üstten çizim: kutu gövde, krom tampon, sarı sis farları
+  function cizTofas(x, y, w, h, t) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(ARAC.yatma * 0.05);
+
+    // gölge
+    ctx.fillStyle = "rgba(0,0,0,.5)";
+    ctx.beginPath(); ctx.ellipse(4, 6, w * 0.62, h * 0.5, 0, 0, 6.284); ctx.fill();
+
+    // tekerler
+    ctx.fillStyle = "#0a0b10";
+    const tw = Math.max(2.5, w * 0.13);
+    ctx.beginPath(); ctx.roundRect(-w / 2 - tw * 0.30, -h * 0.28, tw, h * 0.15, 2); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(w / 2 - tw * 0.70, -h * 0.28, tw, h * 0.15, 2); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(-w / 2 - tw * 0.30, h * 0.14, tw, h * 0.15, 2); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(w / 2 - tw * 0.70, h * 0.14, tw, h * 0.15, 2); ctx.fill();
+
+    // gövde — Tofaş'ın köşeli, kutu hatları
+    const g = ctx.createLinearGradient(-w / 2, 0, w / 2, 0);
+    g.addColorStop(0, "#7f1d1d");
+    g.addColorStop(0.22, "#dc2626");
+    g.addColorStop(0.5, "#ef4444");
+    g.addColorStop(0.78, "#dc2626");
+    g.addColorStop(1, "#7f1d1d");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.roundRect(-w / 2, -h * 0.5, w, h, Math.max(2, w * 0.10));
+    ctx.fill();
+
+    // kaput çizgileri (düz hatlar)
+    ctx.strokeStyle = "rgba(0,0,0,.28)";
+    ctx.lineWidth = Math.max(1, w * 0.02);
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.30, -h * 0.48); ctx.lineTo(-w * 0.30, -h * 0.18);
+    ctx.moveTo(w * 0.30, -h * 0.48); ctx.lineTo(w * 0.30, -h * 0.18);
+    ctx.stroke();
+
+    // ön cam (dik, geniş)
+    ctx.fillStyle = "rgba(15,28,45,.95)";
+    ctx.beginPath();
+    ctx.roundRect(-w * 0.38, -h * 0.17, w * 0.76, h * 0.15, Math.max(2, w * 0.04));
+    ctx.fill();
+
+    // tavan (uzun, düz)
+    ctx.fillStyle = "rgba(255,255,255,.13)";
+    ctx.beginPath();
+    ctx.roundRect(-w * 0.36, -h * 0.01, w * 0.72, h * 0.28, Math.max(2, w * 0.04));
+    ctx.fill();
+    // cam tavan çıtası
+    ctx.strokeStyle = "rgba(0,0,0,.3)";
+    ctx.lineWidth = Math.max(1, w * 0.02);
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.36, h * 0.12); ctx.lineTo(w * 0.36, h * 0.12);
+    ctx.stroke();
+
+    // arka cam
+    ctx.fillStyle = "rgba(15,28,45,.95)";
+    ctx.beginPath();
+    ctx.roundRect(-w * 0.34, h * 0.29, w * 0.68, h * 0.13, Math.max(2, w * 0.035));
+    ctx.fill();
+
+    // krom tamponlar
+    ctx.fillStyle = "#d1d5db";
+    ctx.fillRect(-w * 0.48, -h * 0.50, w * 0.96, Math.max(2.5, h * 0.022));
+    ctx.fillRect(-w * 0.48, h * 0.475, w * 0.96, Math.max(2.5, h * 0.022));
+
+    // farlar (dikdörtgen) + sarı sis farları
+    ctx.fillStyle = "#f8fafc";
+    ctx.fillRect(-w * 0.42, -h * 0.465, w * 0.26, Math.max(3, h * 0.03));
+    ctx.fillRect(w * 0.16, -h * 0.465, w * 0.26, Math.max(3, h * 0.03));
+    ctx.fillStyle = "#fbbf24";
+    ctx.fillRect(-w * 0.13, -h * 0.465, w * 0.10, Math.max(2, h * 0.022));
+    ctx.fillRect(w * 0.03, -h * 0.465, w * 0.10, Math.max(2, h * 0.022));
+
+    // far huzmesi
+    ctx.globalAlpha = 0.10;
+    const huzme = ctx.createLinearGradient(0, -h * 0.5, 0, -h * 1.5);
+    huzme.addColorStop(0, "rgba(255,250,220,.9)");
+    huzme.addColorStop(1, "rgba(255,250,220,0)");
+    ctx.fillStyle = huzme;
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.40, -h * 0.48);
+    ctx.lineTo(w * 0.40, -h * 0.48);
+    ctx.lineTo(w * 0.72, -h * 1.45);
+    ctx.lineTo(-w * 0.72, -h * 1.45);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // stop lambaları (kırmızı dikdörtgen çift)
+    ctx.shadowColor = "#ff2d2d"; ctx.shadowBlur = 12;
+    ctx.fillStyle = "#ff3b3b";
+    ctx.fillRect(-w * 0.44, h * 0.43, w * 0.30, Math.max(3, h * 0.028));
+    ctx.fillRect(w * 0.14, h * 0.43, w * 0.30, Math.max(3, h * 0.028));
+    ctx.shadowBlur = 0;
+
+    // TOFAŞ yazısı
+    ctx.fillStyle = "rgba(255,255,255,.8)";
+    ctx.font = "800 " + Math.max(4, w * 0.13) + 'px "Segoe UI", sans-serif';
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("TOFAŞ", 0, h * 0.465);
+
+    // kalkan
+    if (kalkan > 0) {
+      ctx.strokeStyle = "rgba(140,232,255," + (0.35 + Math.sin((t || 0) * 8) * 0.15).toFixed(2) + ")";
+      ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.ellipse(0, 0, w * 0.9, h * 0.75, 0, 0, 6.284); ctx.stroke();
+    }
+
+    // nitro alevleri
+    if (ARAC.nitroAktif) {
+      for (const ex of [-w * 0.22, w * 0.22]) {
+        const boy = 22 + Math.random() * 24;
+        const fg = ctx.createLinearGradient(ex, h * 0.5, ex, h * 0.5 + boy);
+        fg.addColorStop(0, "rgba(190,255,140,.95)");
+        fg.addColorStop(0.6, "rgba(90,220,255,.55)");
+        fg.addColorStop(1, "rgba(90,220,255,0)");
+        ctx.fillStyle = fg;
+        ctx.beginPath();
+        ctx.moveTo(ex - w * 0.09, h * 0.5);
+        ctx.lineTo(ex + w * 0.09, h * 0.5);
+        ctx.lineTo(ex + w * 0.03, h * 0.5 + boy);
+        ctx.lineTo(ex - w * 0.03, h * 0.5 + boy);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+
+    ctx.restore();
   }
 
   // 2D araba çizimi (üstten)
