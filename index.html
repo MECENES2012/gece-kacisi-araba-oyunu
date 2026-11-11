@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#05080f">
-<title>Gece Kaçışı — Araba Oyunu</title>
+<title>Gece Kaçışı 2D — Araba Oyunu</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
@@ -118,7 +118,7 @@
 
   <!-- 1) İSİM EKRANI -->
   <div class="katman" id="isimEkrani">
-    <h1>GECE KAÇIŞI</h1>
+    <h1>GECE KAÇIŞI 2D</h1>
     <p>Üstten görünümlü 2D gece otoyolunda trafiğe karşı yarış. Skorun isminle birlikte canlı skor tablosuna yazılır.</p>
     <input type="text" id="isimGirdi" maxlength="16" placeholder="İsmini yaz" autocomplete="off" autocapitalize="words" spellcheck="false">
     <div class="satir">
@@ -260,70 +260,82 @@
     el.style.display = goster ? "flex" : "none";
   }
 
-  // ---------- Skor tablosu (bu cihazda saklanır) ----------
+  // ---------- Skor tablosu (çevrim içi: herkesin puanı bu tabloda) ----------
+  const SKOR_BIN = "https://mantledb.sh/v2/gece-kacisi-mecenes2012-2026/skorlar";
   function tumSkorlariOku() {
-    try {
-      const v = JSON.parse(localStorage.getItem("gece2dSkorlar") || "[]");
-      return Array.isArray(v) ? v : [];
-    } catch (e) { return []; }
-  }
-  function tumSkorlariYaz(liste) {
-    try { localStorage.setItem("gece2dSkorlar", JSON.stringify(liste.slice(0, 100))); } catch (e) {}
+    return skorListesi.slice();
   }
   function skorlariYukle(hedefTablo, durumEl, vurguAd) {
-    try {
-      skorListesi = tumSkorlariOku()
-        .slice()
-        .sort((a, b) => b.puan - a.puan)
+    tabloyuCiz(hedefTablo, [], vurguAd);
+    if (durumEl) durumEl.textContent = "Skorlar yükleniyor…";
+    fetch(SKOR_BIN, { cache: "no-store" }).then(function (r) {
+      if (!r.ok) throw new Error("http " + r.status);
+      return r.json();
+    }).then(function (d) {
+      var ham = (d && d.skorlar) || [];
+      var enIyi = new Map();
+      for (var i = 0; i < ham.length; i++) {
+        var k = ham[i];
+        if (!k || !k.isim || !(k.puan > 0)) continue;
+        var anahtar = String(k.isim).toLocaleLowerCase("tr");
+        var onceki = enIyi.get(anahtar);
+        if (!onceki || k.puan > onceki.puan) enIyi.set(anahtar, { isim: String(k.isim).slice(0, 16), puan: Math.round(k.puan) });
+      }
+      skorListesi = Array.from(enIyi.values())
+        .sort(function (a, b) { return b.puan - a.puan; })
         .slice(0, 50)
-        .map((k, i) => ({ sira: i + 1, isim: k.isim, puan: k.puan }));
+        .map(function (k, n) { return { sira: n + 1, isim: k.isim, puan: k.puan }; });
       apiVar = true;
       tabloyuCiz(hedefTablo, skorListesi, vurguAd);
       if (durumEl) durumEl.textContent = skorListesi.length ? skorListesi.length + " oyuncu kayıtlı" : "Henüz skor yok — ilk sen ol!";
-    } catch (e) {
-      apiVar = false;
-      if (hedefTablo) tabloyuCiz(hedefTablo, [], vurguAd);
-      if (durumEl) durumEl.textContent = "Skorlar bu cihazda saklanır.";
-    }
+    }).catch(function () { tabloHata(hedefTablo, durumEl); });
   }
-
-  function tabloyuCiz(el, liste, vurguAd) {
-    if (!el) return;
-    if (!liste || !liste.length) {
-      el.innerHTML = '<div style="padding:18px;font-size:13px;color:#7f93b3">Tablo boş</div>';
-      return;
-    }
-    const madalya = ["🥇", "🥈", "🥉"];
-    let html = "<table><thead><tr><th>#</th><th>Oyuncu</th><th style='text-align:right'>Puan</th></tr></thead><tbody>";
-    for (const s of liste) {
-      const benim = vurguAd && s.isim.toLocaleLowerCase("tr") === String(vurguAd).toLocaleLowerCase("tr");
-      const sira = s.sira <= 3 ? '<span class="mad">' + madalya[s.sira - 1] + "</span>" : s.sira;
-      html += `<tr class="${benim ? "benim" : ""}"><td class="sira">${sira}</td><td>${kacisHtml(s.isim)}</td><td class="puan">${s.puan}</td></tr>`;
-    }
-    html += "</tbody></table>";
-    el.innerHTML = html;
+  function tabloHata(hedefTablo, durumEl) {
+    apiVar = false;
+    if (hedefTablo) tabloyuCiz(hedefTablo, [], oyuncuAdi);
+    if (durumEl) durumEl.textContent = "Skor tablosuna ulaşılamadı — internetini kontrol edip tekrar dene.";
   }
-  function kacisHtml(s) {
-    return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  }
-
   function skorGonder(isim, puan, mesafe) {
     try {
-      const temiz = String(isim || "").slice(0, 16);
-      const liste = tumSkorlariOku();
-      const kayit = { isim: temiz, puan: Math.round(puan), mesafe: Math.round(mesafe) };
-      liste.push(kayit);
-      const enIyi = new Map();
-      for (const k of liste) {
-        const anahtar = String(k.isim).toLocaleLowerCase("tr");
-        const onceki = enIyi.get(anahtar);
-        if (!onceki || k.puan > onceki.puan) enIyi.set(anahtar, k);
-      }
-      const yeni = Array.from(enIyi.values()).sort((x, y) => y.puan - x.puan).slice(0, 100);
-      tumSkorlariYaz(yeni);
-      const sira = yeni.filter(k => k.puan > kayit.puan).length + 1;
-      $("siraBilgi").textContent = "Skor tablosunda " + sira + ". sıradasın (" + yeni.length + " oyuncu)";
+      var kayit = { isim: String(isim || "").slice(0, 16), puan: Math.round(puan), mesafe: Math.round(mesafe) };
+      if (!kayit.isim || !(kayit.puan > 0)) return;
+      $("siraBilgi").textContent = "Skorun kaydediliyor…";
+      fetch(SKOR_BIN, { cache: "no-store" }).then(function (r) {
+        return r.ok ? r.json() : { skorlar: [] };
+      }).then(function (d) {
+        var liste = ((d && d.skorlar) || []).slice();
+        liste.push(kayit);
+        var enIyi = new Map();
+        for (var i = 0; i < liste.length; i++) {
+          var k = liste[i];
+          if (!k || !k.isim || !(k.puan > 0)) continue;
+          var a = String(k.isim).toLocaleLowerCase("tr");
+          var o = enIyi.get(a);
+          if (!o || k.puan > o.puan) enIyi.set(a, { isim: String(k.isim).slice(0, 16), puan: Math.round(k.puan), mesafe: Math.round(k.mesafe || 0) });
+        }
+        var yeni = Array.from(enIyi.values()).sort(function (x, y) { return y.puan - x.puan; }).slice(0, 100);
+        return fetch(SKOR_BIN, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ skorlar: yeni })
+        }).then(function (w) {
+          if (!w.ok) throw new Error("kaydetme hatasi");
+          return yeni;
+        });
+      }).then(function (yeni) {
+        var sira = yeni.filter(function (k) { return k.puan > kayit.puan; }).length + 1;
+        $("siraBilgi").textContent = "Skorun kaydedildi! Herkesin tablosunda " + sira + ". sıradasın (" + yeni.length + " oyuncu).";
+        setTimeout(function () { skorlariYukle($("skorTablosu"), null, oyuncuAdi); }, 2000);
+      }).catch(function () { skorYerelKaydet(kayit); });
     } catch (e) { /* sessiz */ }
+  }
+  function skorYerelKaydet(kayit) {
+    try {
+      var v = JSON.parse(localStorage.getItem("gece2dSkorlar") || "[]");
+      v.push({ isim: kayit.isim, puan: kayit.puan });
+      localStorage.setItem("gece2dSkorlar", JSON.stringify(v.slice(-100)));
+    } catch (e2) {}
+    $("siraBilgi").textContent = "İnternete bağlanılamadı, skor bu cihaza kaydedildi.";
   }
 
   // ---------- Kontroller ----------
