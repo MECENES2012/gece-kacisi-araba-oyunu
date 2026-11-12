@@ -85,6 +85,15 @@
   #skorTablosu tr.benim td { color: #bfe9ff; }
   #tabloDurum { font-size: 12px; color: #7f93b3; }
   .mad { display: inline-block; font-size: 15px; }
+  .secim { gap: 10px; }
+  select {
+    font: inherit; font-size: 16px; font-weight: 700; text-align: center; text-align-last: center;
+    padding: 11px 14px; border-radius: 12px; min-width: 130px;
+    background: #101a29; color: #eef2f7; border: 2px solid #2b4a6b; outline: none;
+    -webkit-appearance: none; appearance: none;
+  }
+  select:focus { border-color: #6fd3ff; box-shadow: 0 0 18px rgba(111,211,255,.3); }
+  select.uyari { border-color: #ff6b81; }
   .logo {
     font-size: clamp(52px, 16vw, 110px); font-weight: 900; letter-spacing: .06em; line-height: 1;
     background: linear-gradient(180deg, #fff, #7fd8ff 55%, #2b7fb8);
@@ -134,9 +143,13 @@
   <div class="katman" id="isimEkrani">
     <div class="logo">MEC</div>
     <h1>MEC YARIŞ</h1>
-    <p>Tofaş ile gece otoyolunda trafiğe karşı yarış. Skorun isminle canlı tabloya yazılır. Skorun isminle birlikte canlı skor tablosuna yazılır.</p>
+    <p>Tofaş ile gece otoyolunda trafiğe karşı yarış. Skorun ismin, sınıfın ve şubenle birlikte canlı tabloya yazılır.</p>
     <div class="odul">🏆 En yüksek skora <b>300 TL ödül!</b></div>
-    <input type="text" id="isimGirdi" maxlength="16" placeholder="İsmini yaz" autocomplete="off" autocapitalize="words" spellcheck="false">
+    <input type="text" id="isimGirdi" maxlength="16" placeholder="Adın Soyadın" autocomplete="off" autocapitalize="words" spellcheck="false">
+    <div class="satir secim">
+      <select id="sinifSec" aria-label="Sınıf"></select>
+      <select id="subeSec" aria-label="Şube"></select>
+    </div>
     <div class="satir">
       <button id="oynaBtn">OYNA</button>
     </div>
@@ -227,6 +240,10 @@
   let can = 3, kalkan = 0, hasarFlash = 0, sarsinti = 0, kombo = 0, komboZaman = 0;
   let trafik = [], esyalar = [], parcalar = [], kenar = [], sonTrafik = 0, sonEsya = 0;
   let oyuncuAdi = localStorage.getItem("gece2dIsim") || "";
+  let oyuncuSinif = localStorage.getItem("gece2dSinif") || "";
+  let oyuncuSube = localStorage.getItem("gece2dSube") || "";
+  const SINIFLAR = ["5", "6", "7", "8", "9", "10", "11", "12"];
+  const SUBELER = ["A", "B", "C", "D", "E", "F", "G", "H"];
   let enIyi = Number(localStorage.getItem("gece2dRekor") || 0);
   let skorListesi = [];
   let apiVar = false;
@@ -318,9 +335,13 @@
     for (var i = 0; i < ham.length; i++) {
       var k = ham[i];
       if (!k || !k.isim || !(k.puan > 0)) continue;
-      var a = String(k.isim).toLocaleLowerCase("tr");
-      var o = enIyi.get(a);
-      if (!o || k.puan > o.puan) enIyi.set(a, { isim: String(k.isim).slice(0, 16), puan: Math.round(k.puan), mesafe: Math.round(k.mesafe || 0) });
+      var isim = String(k.isim).slice(0, 16);
+      var sinif = k.sinif ? String(k.sinif).slice(0, 8) : "";
+      var sube = k.sube ? String(k.sube).slice(0, 4) : "";
+      // aynı isim + aynı sınıf/şube tek kayıt; en yüksek puan tutulur
+      var anahtar = isim.toLocaleLowerCase("tr") + "|" + sinif + "|" + sube;
+      var o = enIyi.get(anahtar);
+      if (!o || k.puan > o.puan) enIyi.set(anahtar, { isim: isim, sinif: sinif, sube: sube, puan: Math.round(k.puan), mesafe: Math.round(k.mesafe || 0) });
     }
     return Array.from(enIyi.values()).sort(function (x, y) { return y.puan - x.puan; }).slice(0, 100);
   }
@@ -361,12 +382,13 @@
       return;
     }
     var madalya = ["🥇", "🥈", "🥉"];
-    var html = "<table><thead><tr><th>#</th><th>Oyuncu</th><th style='text-align:right'>Puan</th></tr></thead><tbody>";
+    var html = "<table><thead><tr><th>#</th><th>Oyuncu</th><th>Sınıf</th><th style='text-align:right'>Puan</th></tr></thead><tbody>";
     for (var i = 0; i < liste.length; i++) {
       var s = liste[i];
       var benim = vurguAd && String(s.isim).toLocaleLowerCase("tr") === String(vurguAd).toLocaleLowerCase("tr");
       var sira = s.sira <= 3 ? '<span class="mad">' + madalya[s.sira - 1] + "</span>" : s.sira;
-      html += '<tr class="' + (benim ? "benim" : "") + '"><td class="sira">' + sira + "</td><td>" + kacisHtml(s.isim) + '</td><td class="puan">' + s.puan + "</td></tr>";
+      var sinif = s.sinif ? (kacisHtml(s.sinif) + (s.sube ? "-" + kacisHtml(s.sube) : "")) : "-";
+      html += '<tr class="' + (benim ? "benim" : "") + '"><td class="sira">' + sira + "</td><td>" + kacisHtml(s.isim) + '</td><td style="color:#9fb0c9;font-size:12px">' + sinif + '</td><td class="puan">' + s.puan + "</td></tr>";
     }
     html += "</tbody></table>";
     el.innerHTML = html;
@@ -377,7 +399,12 @@
 
   // Skoru önce bu cihaza yaz, sonra (birkaç denemeyle) çevrim içi tabloya gönder
   function skorGonder(isim, puan, mesafe) {
-    var kayit = { isim: String(isim || "").slice(0, 16), puan: Math.round(puan), mesafe: Math.round(mesafe) };
+    var kayit = {
+      isim: String(isim || "").slice(0, 16),
+      sinif: String(oyuncuSinif || "").slice(0, 8),
+      sube: String(oyuncuSube || "").slice(0, 4),
+      puan: Math.round(puan), mesafe: Math.round(mesafe)
+    };
     if (!kayit.isim || !(kayit.puan > 0)) return;
     var yerel = yereldenOku();
     yerel.push(kayit);
@@ -520,7 +547,7 @@
     katmanGoster(isimEkrani, false);
     katmanGoster(bitisEkrani, false);
     katmanGoster(tabloEkrani, false);
-    isimVal.textContent = oyuncuAdi || "İsimsiz";
+    isimVal.textContent = (oyuncuAdi || "İsimsiz") + (oyuncuSinif ? " · " + oyuncuSinif + "-" + oyuncuSube : "");
     $("tekrarBtn").textContent = "TEKRAR OYNA";
     $("siraBilgi").textContent = "";
   }
@@ -1146,11 +1173,48 @@
   }
 
   // ---------- Başlangıç ekranı ----------
+  const sinifSec = $("sinifSec"), subeSec = $("subeSec");
+
+  // Sınıf ve şube listelerini doldur
+  (function secenekleriDoldur() {
+    var i, o;
+    o = document.createElement("option");
+    o.value = ""; o.textContent = "Sınıf seç";
+    sinifSec.appendChild(o);
+    for (i = 0; i < SINIFLAR.length; i++) {
+      o = document.createElement("option");
+      o.value = SINIFLAR[i]; o.textContent = SINIFLAR[i] + ". sınıf";
+      sinifSec.appendChild(o);
+    }
+    o = document.createElement("option");
+    o.value = ""; o.textContent = "Şube seç";
+    subeSec.appendChild(o);
+    for (i = 0; i < SUBELER.length; i++) {
+      o = document.createElement("option");
+      o.value = SUBELER[i]; o.textContent = SUBELER[i] + " şubesi";
+      subeSec.appendChild(o);
+    }
+    sinifSec.value = SINIFLAR.indexOf(oyuncuSinif) >= 0 ? oyuncuSinif : "";
+    subeSec.value = SUBELER.indexOf(oyuncuSube) >= 0 ? oyuncuSube : "";
+  })();
+
+  sinifSec.addEventListener("change", function () { sinifSec.classList.remove("uyari"); });
+  subeSec.addEventListener("change", function () { subeSec.classList.remove("uyari"); });
+
   $("oynaBtn").addEventListener("click", () => {
     const ad = (isimGirdi.value || "").trim().replace(/[<>]/g, "").slice(0, 16);
-    if (!ad) { isimGirdi.focus(); isimGirdi.style.borderColor = "#ff6b81"; return; }
+    let eksik = false;
+    if (!ad) { isimGirdi.focus(); isimGirdi.style.borderColor = "#ff6b81"; eksik = true; }
+    if (!sinifSec.value) { sinifSec.classList.add("uyari"); eksik = true; }
+    if (!subeSec.value) { subeSec.classList.add("uyari"); eksik = true; }
+    if (eksik) return;
+
     oyuncuAdi = ad;
-    localStorage.setItem("gece2dIsim", ad);
+    oyuncuSinif = sinifSec.value;
+    oyuncuSube = subeSec.value;
+    localStorage.setItem("gece2dIsim", oyuncuAdi);
+    localStorage.setItem("gece2dSinif", oyuncuSinif);
+    localStorage.setItem("gece2dSube", oyuncuSube);
     baslat();
   });
   isimGirdi.addEventListener("keydown", e => { if (e.key === "Enter") $("oynaBtn").click(); });
