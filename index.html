@@ -85,29 +85,17 @@
   #skorTablosu tr.benim td { color: #bfe9ff; }
   #tabloDurum { font-size: 12px; color: #7f93b3; }
   .mad { display: inline-block; font-size: 15px; }
-  /* kodu yazma alanı (oyun içinde, sağ altta) */
-  #kodKutu {
-    position: absolute; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom));
-    display: flex; gap: 6px; pointer-events: auto;
-  }
+  /* kod alanı (giriş ekranında) */
+  .kodSatir { display: flex; gap: 8px; align-items: center; justify-content: center; }
   #kodGirdi {
-    width: 120px; padding: 9px 11px; font-size: 13px; font-weight: 800;
-    letter-spacing: .12em; text-transform: uppercase; text-align: center;
-    background: rgba(8,14,24,.8); color: #eaf6ff;
-    border: 2px solid #2b4a6b; border-radius: 10px; outline: none;
+    width: 150px; padding: 11px 12px; font-size: 14px; font-weight: 800;
+    letter-spacing: .14em; text-transform: uppercase; text-align: center;
+    background: #101a29; color: #eaf6ff;
+    border: 2px solid #2b4a6b; border-radius: 12px; outline: none;
   }
-  #kodGirdi:focus { border-color: #6fd3ff; }
-  #kodBtn {
-    padding: 9px 13px; font-size: 12px; letter-spacing: .06em;
-    background: linear-gradient(180deg, #6fd3ff, #2b8fc9); color: #04202f;
-    border-radius: 10px; box-shadow: none;
-  }
-  #kodMesaj {
-    position: absolute; right: 14px; bottom: calc(62px + env(safe-area-inset-bottom));
-    font-size: 13px; font-weight: 800; color: #8ce8ff;
-    text-shadow: 0 2px 10px rgba(0,0,0,.8); opacity: 0; transition: opacity .25s;
-  }
-  #kodMesaj.goster { opacity: 1; }
+  #kodGirdi:focus { border-color: #6fd3ff; box-shadow: 0 0 18px rgba(111,211,255,.3); }
+  #kodBtn { padding: 11px 16px; font-size: 13px; letter-spacing: .05em; }
+  #kodMesaj { font-size: 13px; font-weight: 800; color: #8ce8ff; min-height: 18px; }
   .secim { gap: 10px; }
   select {
     font: inherit; font-size: 16px; font-weight: 700; text-align: center; text-align-last: center;
@@ -162,11 +150,6 @@
       </div>
     </div>
     <div id="kombo"></div>
-    <div id="kodKutu">
-      <input type="text" id="kodGirdi" maxlength="20" placeholder="KOD YAZ" autocomplete="off" autocapitalize="characters" spellcheck="false">
-      <button id="kodBtn">UYGULA</button>
-    </div>
-    <div id="kodMesaj"></div>
   </div>
 
   <div id="dokunmatik">
@@ -195,6 +178,11 @@
       <button class="arabaKart" data-araba="sahin"><span class="onizleme sahin"></span>ŞAHİN</button>
       <button class="arabaKart" data-araba="kartal"><span class="onizleme kartal"></span>KARTAL</button>
     </div>
+    <div class="kodSatir">
+      <input type="text" id="kodGirdi" maxlength="20" placeholder="KOD YAZ" autocomplete="off" autocapitalize="characters" spellcheck="false">
+      <button id="kodBtn" class="ikincil">KODU UYGULA</button>
+    </div>
+    <div id="kodMesaj"></div>
     <div class="satir">
       <button id="oynaBtn">OYNA</button>
     </div>
@@ -589,6 +577,7 @@
     ARAC.serit = 1; ARAC.x = seritMerkez(1); ARAC.hedefX = ARAC.x;
     ARAC.hiz = 20; ARAC.yatma = 0; ARAC.nitro = 0.6; ARAC.nitroAktif = false;
     z = 0; skor = 0; mesafeM = 0; zaman = 0;
+    if (kodBonus > 0) skor = kodBonus;   // girişte girilen kodun bonusu oyuna taşınır
     can = 3; kalkan = 1.0; hasarFlash = 0; sarsinti = 0; kombo = 0; komboZaman = 0;
     trafik = []; esyalar = []; parcalar = [];
     sonTrafik = 0; sonEsya = 0;
@@ -1154,112 +1143,106 @@
     ctx.restore();
   }
 
-  // 2D trafik aracı çizimi (üstten) — otomobil / kamyon
+  // 2D trafik aracı — temiz üstten çizim (otomobil / kamyon)
   function cizAraba2D(x, y, w, h, renk, kamyon, oyuncuMu, t) {
     ctx.save();
     ctx.translate(x, y);
     if (oyuncuMu) ctx.rotate(ARAC.yatma * 0.06);
 
-    // gölge
+    const r = Math.max(3, w * 0.22);          // köşe yuvarlaklığı
+    const gövdeR = Math.max(2, w * 0.10);
+
+    // 1) zemin gölgesi
     ctx.fillStyle = "rgba(0,0,0,.45)";
-    ctx.beginPath(); ctx.ellipse(3, 5, w * 0.56, h * 0.52, 0, 0, 6.284); ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(2, 4, w * 0.52, h * 0.5, 0, 0, 6.284);
+    ctx.fill();
 
-    // tekerler
-    ctx.fillStyle = "#0a0b10";
-    const tw = Math.max(2.5, w * 0.14), th = Math.max(4, h * 0.15);
-    ctx.beginPath(); ctx.roundRect(-w / 2 - tw * 0.25, -h * 0.29, tw, th, 2); ctx.fill();
-    ctx.beginPath(); ctx.roundRect(w / 2 - tw * 0.75, -h * 0.29, tw, th, 2); ctx.fill();
-    ctx.beginPath(); ctx.roundRect(-w / 2 - tw * 0.25, h * 0.14, tw, th, 2); ctx.fill();
-    ctx.beginPath(); ctx.roundRect(w / 2 - tw * 0.75, h * 0.14, tw, th, 2); ctx.fill();
+    // 2) tekerler (gövdenin ALTINDA, dışarı taşan)
+    ctx.fillStyle = "#08090c";
+    const tw = Math.max(3, w * 0.16), th = Math.max(6, h * 0.16);
+    ctx.beginPath(); ctx.roundRect(-w / 2 - tw * 0.28, -h * 0.30, tw, th, 2); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(w / 2 - tw * 0.72, -h * 0.30, tw, th, 2); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(-w / 2 - tw * 0.28, h * 0.14, tw, th, 2); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(w / 2 - tw * 0.72, h * 0.14, tw, th, 2); ctx.fill();
 
-    // gövde — yandan ışık alan yumuşak gradyan
+    // 3) gövde — tek parça, net silüet
     const g = ctx.createLinearGradient(-w / 2, 0, w / 2, 0);
-    g.addColorStop(0, "rgba(0,0,0,.65)");
-    g.addColorStop(0.24, renk);
-    g.addColorStop(0.48, "#ffffff");
-    g.addColorStop(0.58, renk);
-    g.addColorStop(0.86, renk);
-    g.addColorStop(1, "rgba(0,0,0,.65)");
+    g.addColorStop(0, "rgba(0,0,0,.70)");
+    g.addColorStop(0.18, renk);
+    g.addColorStop(0.45, "#ffffff");
+    g.addColorStop(0.55, renk);
+    g.addColorStop(0.85, renk);
+    g.addColorStop(1, "rgba(0,0,0,.70)");
     ctx.fillStyle = g;
     ctx.beginPath();
+    ctx.roundRect(-w / 2, -h / 2, w, h, gövdeR);
+    ctx.fill();
+
+    // 4) ince kontur (silüet netliği)
+    ctx.strokeStyle = "rgba(0,0,0,.55)";
+    ctx.lineWidth = Math.max(1, w * 0.03);
+    ctx.beginPath();
+    ctx.roundRect(-w / 2, -h / 2, w, h, gövdeR);
+    ctx.stroke();
+
     if (kamyon) {
-      // kamyon: kabin + kasa, köşeli
-      ctx.roundRect(-w / 2, -h / 2, w, h, Math.max(2, w * 0.08));
+      // kasa (arkada, açık ton)
+      ctx.fillStyle = "rgba(255,255,255,.14)";
+      ctx.beginPath();
+      ctx.roundRect(-w * 0.42, -h * 0.44, w * 0.84, h * 0.58, Math.max(2, w * 0.06));
       ctx.fill();
-      // kasa bölmeleri
-      ctx.fillStyle = "rgba(255,255,255,.10)";
-      ctx.fillRect(-w * 0.40, -h * 0.44, w * 0.80, h * 0.56);
       ctx.strokeStyle = "rgba(0,0,0,.35)";
       ctx.lineWidth = 1.2;
       for (let i = 1; i < 5; i++) {
-        ctx.beginPath();
-        ctx.moveTo(-w * 0.40, -h * 0.44 + (h * 0.56 / 5) * i);
-        ctx.lineTo(w * 0.40, -h * 0.44 + (h * 0.56 / 5) * i);
-        ctx.stroke();
+        const yy = -h * 0.44 + (h * 0.58 / 5) * i;
+        ctx.beginPath(); ctx.moveTo(-w * 0.40, yy); ctx.lineTo(w * 0.40, yy); ctx.stroke();
       }
-      // kabin camı
+      // kabin camı (önde)
       ctx.fillStyle = "rgba(14,26,42,.92)";
-      ctx.beginPath(); ctx.roundRect(-w * 0.34, h * 0.16, w * 0.68, h * 0.16, 3); ctx.fill();
-    } else {
-      // otomobil: ön/arka daralan yumuşak hatlar
-      ctx.moveTo(0, -h * 0.50);
-      ctx.bezierCurveTo(w * 0.46, -h * 0.44, w * 0.50, -h * 0.10, w * 0.47, h * 0.22);
-      ctx.bezierCurveTo(w * 0.46, h * 0.40, w * 0.36, h * 0.50, 0, h * 0.50);
-      ctx.bezierCurveTo(-w * 0.36, h * 0.50, -w * 0.46, h * 0.40, -w * 0.47, h * 0.22);
-      ctx.bezierCurveTo(-w * 0.50, -h * 0.10, -w * 0.46, -h * 0.44, 0, -h * 0.50);
-      ctx.closePath();
+      ctx.beginPath();
+      ctx.roundRect(-w * 0.34, h * 0.18, w * 0.68, h * 0.16, Math.max(2, w * 0.05));
       ctx.fill();
+    } else {
+      // ön cam
+      ctx.fillStyle = "rgba(14,26,42,.92)";
+      ctx.beginPath();
+      ctx.roundRect(-w * 0.34, -h * 0.28, w * 0.68, h * 0.17, r * 0.5);
+      ctx.fill();
+      // tavan (parlak)
+      const tavan = ctx.createLinearGradient(0, -h * 0.10, 0, h * 0.22);
+      tavan.addColorStop(0, "rgba(255,255,255,.30)");
+      tavan.addColorStop(1, "rgba(255,255,255,.10)");
+      ctx.fillStyle = tavan;
+      ctx.beginPath();
+      ctx.roundRect(-w * 0.30, -h * 0.09, w * 0.60, h * 0.31, r * 0.5);
+      ctx.fill();
+      // arka cam
+      ctx.fillStyle = "rgba(14,26,42,.92)";
+      ctx.beginPath();
+      ctx.roundRect(-w * 0.30, h * 0.24, w * 0.60, h * 0.15, r * 0.4);
+      ctx.fill();
+      // yan aynalar
+      ctx.fillStyle = "rgba(20,30,45,.9)";
+      ctx.beginPath(); ctx.roundRect(-w * 0.56, -h * 0.20, w * 0.11, h * 0.05, 1); ctx.fill();
+      ctx.beginPath(); ctx.roundRect(w * 0.45, -h * 0.20, w * 0.11, h * 0.05, 1); ctx.fill();
     }
 
-    // ön cam (eğimli)
-    ctx.fillStyle = "rgba(14,26,42,.92)";
-    ctx.beginPath();
-    ctx.moveTo(-w * 0.32, -h * 0.20);
-    ctx.quadraticCurveTo(0, -h * 0.28, w * 0.32, -h * 0.20);
-    ctx.lineTo(w * 0.30, -h * 0.02);
-    ctx.quadraticCurveTo(0, -h * 0.08, -w * 0.30, -h * 0.02);
-    ctx.closePath();
-    ctx.fill();
-
-    // tavan (açık ton)
-    const tavan = ctx.createLinearGradient(0, -h * 0.02, 0, h * 0.26);
-    tavan.addColorStop(0, "rgba(255,255,255,.26)");
-    tavan.addColorStop(1, "rgba(255,255,255,.10)");
-    ctx.fillStyle = tavan;
-    ctx.beginPath();
-    ctx.roundRect(-w * 0.28, -h * 0.02, w * 0.56, h * 0.28, Math.max(2, w * 0.08));
-    ctx.fill();
-
-    // arka cam
-    ctx.fillStyle = "rgba(14,26,42,.92)";
-    ctx.beginPath();
-    ctx.moveTo(-w * 0.29, h * 0.27);
-    ctx.quadraticCurveTo(0, h * 0.33, w * 0.29, h * 0.27);
-    ctx.lineTo(w * 0.25, h * 0.41);
-    ctx.quadraticCurveTo(0, h * 0.45, -w * 0.25, h * 0.41);
-    ctx.closePath();
-    ctx.fill();
-
-    // yan aynalar
-    ctx.fillStyle = "rgba(20,30,45,.9)";
-    ctx.fillRect(-w * 0.52, -h * 0.16, w * 0.10, h * 0.05);
-    ctx.fillRect(w * 0.42, -h * 0.16, w * 0.10, h * 0.05);
-
-    // farlar (ön)
+    // 5) farlar (ön = üst)
     ctx.fillStyle = "#f8fafc";
-    ctx.beginPath(); ctx.ellipse(-w * 0.30, -h * 0.45, w * 0.10, h * 0.028, 0, 0, 6.284); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(w * 0.30, -h * 0.45, w * 0.10, h * 0.028, 0, 0, 6.284); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(-w * 0.40, -h * 0.50, w * 0.22, Math.max(2.5, h * 0.03), 1.5); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(w * 0.18, -h * 0.50, w * 0.22, Math.max(2.5, h * 0.03), 1.5); ctx.fill();
 
-    // stop lambaları
+    // 6) stop lambaları (arka = alt)
     ctx.shadowColor = "#ff2d2d"; ctx.shadowBlur = 10;
     ctx.fillStyle = "#ff3b3b";
-    ctx.beginPath(); ctx.roundRect(-w * 0.40, h * 0.44, w * 0.26, Math.max(2.5, h * 0.028), 2); ctx.fill();
-    ctx.beginPath(); ctx.roundRect(w * 0.14, h * 0.44, w * 0.26, Math.max(2.5, h * 0.028), 2); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(-w * 0.40, h * 0.45, w * 0.22, Math.max(2.5, h * 0.03), 1.5); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(w * 0.18, h * 0.45, w * 0.22, Math.max(2.5, h * 0.03), 1.5); ctx.fill();
     ctx.shadowBlur = 0;
 
-    // plaka
-    ctx.fillStyle = "rgba(240,245,250,.85)";
-    ctx.fillRect(-w * 0.12, h * 0.455, w * 0.24, Math.max(2, h * 0.02));
+    // 7) plaka
+    ctx.fillStyle = "rgba(240,245,250,.9)";
+    ctx.fillRect(-w * 0.11, h * 0.465, w * 0.22, Math.max(2, h * 0.018));
 
     // kalkan
     if (oyuncuMu && kalkan > 0) {
@@ -1325,6 +1308,7 @@
   // ---------- Kod alanı: MEC300 yazana +2000 skor ----------
   const kodGirdi = $("kodGirdi"), kodBtn = $("kodBtn"), kodMesaj = $("kodMesaj");
   let kodKullanildi = localStorage.getItem("gece2dKodMec300") === "1";
+  let kodBonus = 0;
   let kodMesajZaman = null;
   function kodMesajiYaz(metin) {
     kodMesaj.textContent = metin;
@@ -1333,18 +1317,17 @@
     kodMesajZaman = setTimeout(function () { kodMesaj.classList.remove("goster"); }, 2600);
   }
   function kodUygula() {
-    if (durum !== OYUN) { kodMesajiYaz("Önce oyunu başlat"); return; }
     var kod = (kodGirdi.value || "").trim().toUpperCase();
-    if (!kod) return;
+    if (!kod) { kodMesajiYaz("Bir kod yaz"); return; }
     if (kod === "MEC300") {
       if (kodKullanildi) { kodMesajiYaz("Bu kodu zaten kullandın"); kodGirdi.value = ""; return; }
-      skor += 2000;
       kodKullanildi = true;
       localStorage.setItem("gece2dKodMec300", "1");
-      kodMesajiYaz("🎁 MEC300 kabul edildi: +2000 skor!");
+      kodBonus = 2000;
+      if (durum === OYUN) { skor += 2000; hudCiz(); }
+      kodMesajiYaz("🎁 MEC300 kabul edildi: oyunda +2000 skor!");
       bip(880, 0.15, "sine", 0.08);
       setTimeout(function () { bip(1180, 0.2, "sine", 0.07); }, 140);
-      hudCiz();
     } else {
       kodMesajiYaz("Geçersiz kod");
       bip(180, 0.18, "square", 0.05);
