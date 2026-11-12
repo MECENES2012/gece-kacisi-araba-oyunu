@@ -1305,7 +1305,7 @@
     requestAnimationFrame(dongu);
   }
 
-  // ---------- Kod alanı: ENES3000 (ve MEC300) yazana +2000 skor ----------
+  // ---------- Kod alanı: ENES300 (ve MEC300) yazana +2000 skor ----------
   const kodGirdi = $("kodGirdi"), kodBtn = $("kodBtn"), kodMesaj = $("kodMesaj");
   let kodKullanildi = localStorage.getItem("gece2dKodMec300v2") === "1";
   let kodBonus = 0;
@@ -1319,7 +1319,7 @@
   function kodUygula() {
     var kod = (kodGirdi.value || "").trim().toUpperCase();
     if (!kod) { kodMesajiYaz("Bir kod yaz"); return; }
-    if (kod === "ENES3000" || kod === "MEC300") {
+    if (kod === "ENES300" || kod === "MEC300") {
       var anahtar = "gece2dKod_" + kod;
       if (localStorage.getItem(anahtar) === "1") { kodMesajiYaz("Bu kodu zaten kullandın"); kodGirdi.value = ""; return; }
       localStorage.setItem(anahtar, "1");
