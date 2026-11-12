@@ -436,10 +436,23 @@
   }
 
   // ---------- Kontroller ----------
+  let sonSeritZamani = 0;
   function seritDegistir(yon) {
     if (durum !== OYUN) return;
-    const yeni = sinirla(ARAC.serit + yon, 0, 2);
-    if (yeni !== ARAC.serit) {
+    // Tek basış = tek şerit: 300 ms içindeki ikinci tetikleme (klavye tekrarı,
+    // dokunma + kaydırma, mousedown + touchstart) yok sayılır.
+    const simdi = performance.now();
+    if (simdi - sonSeritZamani < 300) return;
+    // Araba henüz hedefe varmadıysa hedef üzerinden say (iki kez kaymasın)
+    let mevcut = ARAC.serit;
+    let enKucuk = Infinity;
+    for (let i = 0; i < 3; i++) {
+      const d = Math.abs(seritMerkez(i) - ARAC.hedefX);
+      if (d < enKucuk) { enKucuk = d; mevcut = i; }
+    }
+    const yeni = sinirla(mevcut + yon, 0, 2);
+    if (yeni !== mevcut) {
+      sonSeritZamani = simdi;
       ARAC.serit = yeni;
       ARAC.hedefX = seritMerkez(yeni);
       bip(430, 0.05, "square", 0.025);
@@ -450,6 +463,7 @@
     basili[e.key] = true;
     if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " "].includes(e.key)) e.preventDefault();
     if (durum === OYUN) {
+      if (e.repeat) return;
       if (e.key === "ArrowLeft" || e.key === "a" || e.key === "A") seritDegistir(-1);
       if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") seritDegistir(1);
       if (e.key === "p" || e.key === "P") duraklat();
@@ -616,18 +630,18 @@
   let sonZaman = performance.now();
   function guncelle(dt) {
     zaman += dt;
-    const sol = girdi.sol || basili["ArrowLeft"] || basili["a"] || basili["A"];
-    const sag = girdi.sag || basili["ArrowRight"] || basili["d"] || basili["D"];
+    // Şerit değişimi SADECE tek basışla olur (seritDegistir).
+    // Basılı tutma ile sürekli kayma yok: hedef her zaman bir şeridin ortasıdır.
     const nitroBas = girdi.nitro || basili[" "] || basili["Shift"];
 
-    if (sol) ARAC.hedefX = Math.max(-SERIT_G, ARAC.hedefX - dt * SERIT_G * 4.5);
-    if (sag) ARAC.hedefX = Math.min(SERIT_G, ARAC.hedefX + dt * SERIT_G * 4.5);
-    if (!sol && !sag) {
-      let en = 1, kucuk = Infinity;
-      for (let i = 0; i < 3; i++) { const d = Math.abs(seritMerkez(i) - ARAC.hedefX); if (d < kucuk) { kucuk = d; en = i; } }
-      ARAC.serit = en;
-      ARAC.hedefX = seritMerkez(en);
+    // Hedefi her zaman geçerli bir şerit merkezine sabitle (iki şerit arasında kalmasın)
+    let enYakin = 1, enKucuk = Infinity;
+    for (let i = 0; i < 3; i++) {
+      const d = Math.abs(seritMerkez(i) - ARAC.hedefX);
+      if (d < enKucuk) { enKucuk = d; enYakin = i; }
     }
+    ARAC.serit = enYakin;
+    ARAC.hedefX = seritMerkez(enYakin);
     const fark = ARAC.hedefX - ARAC.x;
     ARAC.x += fark * Math.min(1, dt * 10);
     ARAC.yatma += (fark * 0.9 - ARAC.yatma) * Math.min(1, dt * 8);
