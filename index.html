@@ -260,8 +260,8 @@
 
   function yolGen() { return Math.min(W * 0.9, 420); }
   // araç ölçüleri (şerit genişliğine göre) — ince ve uzun görünüm
-  function oyuncuGen() { return Math.max(26, Math.min(yolGen() / 3 * 0.50, 44)); }
-  const OYUNCU_UZ = 92;
+  function oyuncuGen() { return Math.max(20, Math.min(yolGen() / 3 * 0.36, 32)); }
+  const OYUNCU_UZ = 118;
   function yolSol() { return (W - yolGen()) / 2; }
 
   // ---------- Durum ----------
@@ -721,7 +721,7 @@
       const dz = t.z - z;
       if (!t.carpildi && dz > -t.uz * 0.5 - 0.4 && dz < t.uz * 0.5 + 1.2) {
         const dx = Math.abs(t.x - ARAC.x);
-        if (dx < (t.gen + 0.62) * 0.42) {
+        if (dx < (t.gen + 0.52) * 0.42) {
           t.carpildi = true; t.gecenSure = 0;
           if (kalkan > 0) {
             t.z += 10;
@@ -949,7 +949,7 @@
       const ey = H - (tr.z - z) * YOL_BIRIM;
       if (ey < -160 || ey > H + 160) continue;
       const ex = ys + sg * (tr.x / SERIT_G + 1) + sg / 2;
-      cizAraba2D(ex, ey, tr.gen * sg * 0.64, tr.uz * YOL_BIRIM * 0.88, tr.renk, tr.kamyon, false);
+      cizAraba2D(ex, ey, tr.gen * sg * 0.52, tr.uz * YOL_BIRIM * 1.02, tr.renk, tr.kamyon, false);
       // araba adı etiketi (yakındaki araçlarda)
       if (tr.ad && ey > -40 && ey < H * 0.92) {
         ctx.globalAlpha = 0.85;
@@ -1305,9 +1305,9 @@
     requestAnimationFrame(dongu);
   }
 
-  // ---------- Kod alanı: MEC300 yazana +2000 skor ----------
+  // ---------- Kod alanı: MEC300 yazana +4000 skor ----------
   const kodGirdi = $("kodGirdi"), kodBtn = $("kodBtn"), kodMesaj = $("kodMesaj");
-  let kodKullanildi = localStorage.getItem("gece2dKodMec300") === "1";
+  let kodKullanildi = localStorage.getItem("gece2dKodMec300v2") === "1";
   let kodBonus = 0;
   let kodMesajZaman = null;
   function kodMesajiYaz(metin) {
@@ -1322,10 +1322,10 @@
     if (kod === "MEC300") {
       if (kodKullanildi) { kodMesajiYaz("Bu kodu zaten kullandın"); kodGirdi.value = ""; return; }
       kodKullanildi = true;
-      localStorage.setItem("gece2dKodMec300", "1");
-      kodBonus = 2000;
-      if (durum === OYUN) { skor += 2000; hudCiz(); }
-      kodMesajiYaz("🎁 MEC300 kabul edildi: oyunda +2000 skor!");
+      localStorage.setItem("gece2dKodMec300v2", "1");
+      kodBonus = 4000;
+      if (durum === OYUN) { skor += 4000; hudCiz(); }
+      kodMesajiYaz("🎁 MEC300 kabul edildi: oyunda +4000 skor!");
       bip(880, 0.15, "sine", 0.08);
       setTimeout(function () { bip(1180, 0.2, "sine", 0.07); }, 140);
     } else {
