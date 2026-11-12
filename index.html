@@ -94,6 +94,18 @@
   }
   select:focus { border-color: #6fd3ff; box-shadow: 0 0 18px rgba(111,211,255,.3); }
   select.uyari { border-color: #ff6b81; }
+  .arabaSec { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  .arabaKart {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: 8px 14px; font-size: 12px; font-weight: 800; letter-spacing: .05em;
+    background: rgba(16,26,41,.9); color: #9fb0c9;
+    border: 2px solid #2b4a6b; border-radius: 12px; box-shadow: none;
+  }
+  .arabaKart.secili { border-color: #6fd3ff; color: #eaf6ff; box-shadow: 0 0 18px rgba(111,211,255,.35); }
+  .onizleme { display: block; width: 26px; height: 46px; border-radius: 6px 6px 4px 4px; }
+  .onizleme.tofas  { background: linear-gradient(180deg, #ef4444, #7f1d1d); }
+  .onizleme.sahin  { background: linear-gradient(180deg, #f8fafc, #94a3b8); }
+  .onizleme.kartal { background: linear-gradient(180deg, #3b82f6, #1e3a8a); }
   .logo {
     font-size: clamp(52px, 16vw, 110px); font-weight: 900; letter-spacing: .06em; line-height: 1;
     background: linear-gradient(180deg, #fff, #7fd8ff 55%, #2b7fb8);
@@ -149,6 +161,11 @@
     <div class="satir secim">
       <select id="sinifSec" aria-label="Sınıf"></select>
       <select id="subeSec" aria-label="Şube"></select>
+    </div>
+    <div class="arabaSec" id="arabaSec">
+      <button class="arabaKart secili" data-araba="tofas"><span class="onizleme tofas"></span>TOFAŞ</button>
+      <button class="arabaKart" data-araba="sahin"><span class="onizleme sahin"></span>ŞAHİN</button>
+      <button class="arabaKart" data-araba="kartal"><span class="onizleme kartal"></span>KARTAL</button>
     </div>
     <div class="satir">
       <button id="oynaBtn">OYNA</button>
@@ -241,6 +258,9 @@
   let trafik = [], esyalar = [], parcalar = [], kenar = [], sonTrafik = 0, sonEsya = 0;
   let oyuncuAdi = localStorage.getItem("gece2dIsim") || "";
   let oyuncuSinif = localStorage.getItem("gece2dSinif") || "";
+  let seciliAraba = localStorage.getItem("gece2dAraba") || "tofas";
+  const ARABA_RENK = { tofas: "#ef4444", sahin: "#e2e8f0", kartal: "#3b82f6" };
+  const ARABA_ADI = { tofas: "TOFAŞ", sahin: "ŞAHİN", kartal: "KARTAL" };
   let oyuncuSube = localStorage.getItem("gece2dSube") || "";
   const SINIFLAR = ["5", "6", "7", "8", "9", "10", "11", "12"];
   const SUBELER = ["A", "B", "C", "D", "E", "F", "G", "H"];
@@ -888,7 +908,7 @@
     // --- oyuncu ---
     const oy = H - 110;
     const ox = ys + sg * (ARAC.x / SERIT_G + 1) + sg / 2;
-    cizTofas(ox, oy, oyuncuGen(), OYUNCU_UZ, t);
+    cizOyuncuAraba(ox, oy, oyuncuGen(), OYUNCU_UZ, t);
 
     // parçacıklar
     for (const p of parcalar) {
@@ -929,10 +949,16 @@
   }
 
   // TOFAŞ (Kartal/SLX) — üstten çizim: kutu gövde, krom tampon, sarı sis farları
-  function cizTofas(x, y, w, h, t) {
+  // Seçili arabayı çiz (Tofaş / Şahin / Kartal — aynı kasa, farklı renk)
+  function cizOyuncuAraba(x, y, w, h, t) {
+    cizTofas(x, y, w, h, t, ARABA_RENK[seciliAraba] || "#ef4444", ARABA_ADI[seciliAraba] || "TOFAŞ");
+  }
+  function cizTofas(x, y, w, h, t, renkAna, ad) {
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(ARAC.yatma * 0.05);
+    renkAna = renkAna || "#ef4444";
+    ad = ad || "TOFAŞ";
 
     // gölge
     ctx.fillStyle = "rgba(0,0,0,.5)";
@@ -948,11 +974,12 @@
 
     // gövde — Tofaş'ın köşeli, kutu hatları
     const g = ctx.createLinearGradient(-w / 2, 0, w / 2, 0);
-    g.addColorStop(0, "#7f1d1d");
-    g.addColorStop(0.22, "#dc2626");
-    g.addColorStop(0.5, "#ef4444");
-    g.addColorStop(0.78, "#dc2626");
-    g.addColorStop(1, "#7f1d1d");
+    g.addColorStop(0, "rgba(0,0,0,.55)");
+    g.addColorStop(0.22, renkAna);
+    g.addColorStop(0.5, "#ffffff");
+    g.addColorStop(0.62, renkAna);
+    g.addColorStop(0.88, renkAna);
+    g.addColorStop(1, "rgba(0,0,0,.55)");
     ctx.fillStyle = g;
     ctx.beginPath();
     ctx.roundRect(-w / 2, -h * 0.5, w, h, Math.max(2, w * 0.10));
@@ -1026,10 +1053,10 @@
     ctx.shadowBlur = 0;
 
     // TOFAŞ yazısı
-    ctx.fillStyle = "rgba(255,255,255,.8)";
+    ctx.fillStyle = "rgba(0,0,0,.55)";
     ctx.font = "800 " + Math.max(4, w * 0.13) + 'px "Segoe UI", sans-serif';
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText("TOFAŞ", 0, h * 0.465);
+    ctx.fillText(ad, 0, h * 0.465);
 
     // kalkan
     if (kalkan > 0) {
@@ -1214,6 +1241,24 @@
 
   sinifSec.addEventListener("change", function () { sinifSec.classList.remove("uyari"); });
   subeSec.addEventListener("change", function () { subeSec.classList.remove("uyari"); });
+
+  // ---------- Araba seçimi (Tofaş / Şahin / Kartal) ----------
+  const arabaDugmeleri = document.querySelectorAll("#arabaSec .arabaKart");
+  function arabaSecimiYansit() {
+    for (var i = 0; i < arabaDugmeleri.length; i++) {
+      arabaDugmeleri[i].classList.toggle("secili", arabaDugmeleri[i].getAttribute("data-araba") === seciliAraba);
+    }
+  }
+  for (var ai = 0; ai < arabaDugmeleri.length; ai++) {
+    (function (dugme) {
+      dugme.addEventListener("click", function () {
+        seciliAraba = dugme.getAttribute("data-araba");
+        localStorage.setItem("gece2dAraba", seciliAraba);
+        arabaSecimiYansit();
+      });
+    })(arabaDugmeleri[ai]);
+  }
+  arabaSecimiYansit();
 
   $("oynaBtn").addEventListener("click", () => {
     const ad = (isimGirdi.value || "").trim().replace(/[<>]/g, "").slice(0, 16);
